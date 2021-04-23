@@ -30,8 +30,6 @@ if (!argv.lang) {
   process.exit(1)
 }
 
-console.log(JSON.stringify(argv, null, 2))
-
 const langs = Array.isArray(argv.lang) ? argv.lang : [argv.lang]
 const client = new POEditorClient({
   apiToken: argv['api-token'],
