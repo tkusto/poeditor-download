@@ -7,11 +7,13 @@ const POEditorClient = require('./lib/poeditor-client')
 
 const argv = minimist(process.argv, {
   string: ['project-id', 'api-token', 'out', 'lang'],
+  boolean: ['split-by-context'],
   alias: {
     p: 'project-id',
     l: 'lang',
     o: 'out',
-    t: 'api-token'
+    t: 'api-token',
+    C: 'split-by-context'
   }
 })
 
@@ -28,6 +30,8 @@ if (!argv.lang) {
   process.exit(1)
 }
 
+console.log(JSON.stringify(argv, null, 2))
+
 const langs = Array.isArray(argv.lang) ? argv.lang : [argv.lang]
 const client = new POEditorClient({
   apiToken: argv['api-token'],
@@ -36,9 +40,31 @@ const client = new POEditorClient({
 
 langs.forEach(async (lang) => {
   const data = await client.export(lang)
-  const outPath = argv.out.replace('{{lng}}', lang)
-  const absoluteOutPath = path.resolve(outPath)
-  const dirPath = path.dirname(absoluteOutPath)
-  await fs.mkdir(dirPath, { recursive: true })
-  await fs.writeFile(absoluteOutPath, data)
+  if (argv['split-by-context']) {
+    await writeContexts(lang, data)
+  } else {
+    await writeLang(lang, data)
+  }
 })
+
+async function writeLang(lang, data) {
+  const outPath = argv.out.replace('{{lng}}', lang)
+  const absOutPath = path.resolve(outPath)
+  const dirPath = path.dirname(absOutPath)
+  await fs.mkdir(dirPath, { recursive: true })
+  await fs.writeFile(absOutPath, data)
+}
+
+async function writeContexts(lang, data) {
+  const jsonData = JSON.parse(data)
+  const contexts = Object.keys(jsonData).filter(ctx => typeof jsonData[ctx] === 'object')
+  await Promise.all(contexts.map(async ctx => {
+    const outPath = argv.out
+      .replace('{{ctx}}', ctx)
+      .replace('{{lng}}', lang)
+    const absOutPath = path.resolve(outPath)
+    const dirPath = path.dirname(absOutPath)
+    await fs.mkdir(dirPath, { recursive: true })
+    await fs.writeFile(absOutPath, JSON.stringify(jsonData[ctx]))
+  }))
+}
